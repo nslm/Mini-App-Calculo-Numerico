@@ -1,0 +1,892 @@
+---
+title: "Calculo 3"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    source_code: embed
+    theme: cerulean
+runtime: shiny
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+options(scipen = 999)
+library(flexdashboard)
+library(shiny)
+library(stringr)
+library(ggplot2)
+library(plotly)
+library(polynom)
+bootstrapPage()
+```
+
+```{r include = FALSE}
+
+arredondar = function(x,y){
+  x = as.numeric(x)
+  
+  len = str_length(as.character(round(x)))
+  
+  if(x<0){
+    h = 2
+  } else {
+    h = 1
+  }
+  if(x!=0){
+      n = 0
+      x2 = abs(x)
+      while(x2<1){
+        x2 = x2*10
+        n = n + 1
+      }
+  }
+  if(str_length(as.character(x))>len+y+h){
+    nextnum = as.numeric(substr(as.character(x), start = len+y+h+1, stop = len+y+h+1))
+    if(nextnum!=0){
+        if(nextnum<5){
+          return(as.numeric(substr(
+            as.character(x), start = 1, stop = len+y+h)))
+        }  else {
+            num = as.numeric(substr(as.character(x), start = 1, stop = len+y+h))
+            num = num - (h*2-3)*(1/10**(y))
+            return(as.numeric(num))
+        }
+    } else{
+        return(as.numeric(substr(
+            as.character(x), start = 1, stop = len+y+h)))
+    }
+  } else {
+      return(x)
+  }
+}
+
+truncar = function(x,y){
+  
+  x = as.numeric(x)
+  
+  if(is.integer(x)){
+    return(x)
+  } else{
+    if(x<0){
+      return(as.numeric(substr(
+      as.character(x), start = 1, stop = length(as.character(round(x)))+y+2)))
+    } else {
+    return(as.numeric(substr(
+      as.character(x), start = 1, stop = length(as.character(round(x)))+y+1)))
+    }
+  }
+}
+
+derivar = function(expr){
+    if(is.character(expr)){
+      h = parse(text = expr)
+    } else{
+      h = expr
+    }
+    h2 = D(h,"x")
+    return(h2)
+} 
+ 
+
+```
+
+esboco do grafico
+=======================================================================
+
+Input {.sidebar data-width=160}
+-----------------------------------------------------------------------
+
+```{r}
+
+textInput(
+  "expr3",
+  "f(x)",
+  "x^4-70")
+
+numericInput("g1", "grafico inicio x", -2)
+numericInput("g2", "grafico fim x", 2)
+textInput("by", "by", value = 0.1)
+
+```
+
+Output 
+-----------------------------------------------------------------------
+
+### f(x)
+
+```{r}
+renderPlotly({
+  
+  f = function(x){
+      return(eval(parse(text = input$expr3)))
+  }
+
+  g1 = input$g1
+  g2 = input$g2
+  by = as.numeric(input$by)
+  dfg = data.frame(x = seq(g1,g2,by))
+
+  dfg$y = f(dfg$x)
+  
+ ggplot(data = dfg, aes(x = x, y = y))  + geom_line()
+ 
+  
+})
+
+```
+
+### f'(x)
+
+```{r}
+renderPlotly({
+  
+  fdx = function(x){
+    h = D(parse(text = input$expr3),"x")
+    return(eval(h))
+  }
+  
+  g1 = input$g1
+  g2 = input$g2
+  by = as.numeric(input$by)
+  dfg = data.frame(x = seq(g1,g2,by))
+
+  dfg$ydx = fdx(dfg$x)
+  
+  ggplot(data = dfg, aes(x = x, y = ydx)) + geom_line()
+ 
+  
+})
+```
+
+Row
+-----------------------------------------------------------------------
+
+### f''(x)
+
+```{r}
+renderPlotly({
+  
+  fdx2 = function(x){
+      h = derivar(derivar(parse(text = input$expr3)))
+      return(eval(h))
+  }
+  
+  g1 = input$g1
+  g2 = input$g2
+  by = as.numeric(input$by)
+  dfg = data.frame(x = seq(g1,g2,by))
+  
+  dfg$ydx2 = fdx2(dfg$x)
+  
+  ggplot(data = dfg, aes(x = x, y = ydx2)) + geom_line()
+
+})
+```
+
+### f'''(x)
+
+```{r}
+renderPlotly({
+  
+  fdx3 = function(x){
+      h = derivar(derivar(derivar(parse(text = input$expr3))))
+      return(eval(h))
+  }
+  
+  g1 = input$g1
+  g2 = input$g2
+  by = as.numeric(input$by)
+  dfg = data.frame(x = seq(g1,g2,by))
+  
+  dfg$ydx3 = fdx3(dfg$x)
+  
+  ggplot(data = dfg, aes(x = x, y = ydx3)) + geom_line()
+
+})
+```
+
+
+zero da funcao
+=======================================================================
+
+Input {.sidebar data-width=160}
+-----------------------------------------------------------------------
+
+```{r}
+textInput(
+  "expr",
+  "f(x)",
+  "x^4-70")
+
+textInput("x0", "x0 (newton)", value = 3)
+textInput("a", "a (intervalo)", value = 2)
+textInput("b", "b (intervalo)", value = 3)
+textInput("E", "erro", value = 0.0001)
+numericInput("r", "casas decimais", 6)
+selectInput("t", "trunc. ou arren.", choices = c("arredondamento","truncamento"),width = 220)
+
+```
+
+
+Output {data-height=100}
+-----------------------------------------------------------------------
+### f(x)
+
+```{r}
+span(textOutput("text1"), style="color: black;
+                                 font-size: 12px;
+                                 font-style: italic")
+output$text1 = renderText({
+  input$expr
+})
+
+```
+
+### f'(x)
+
+```{r}
+span(textOutput("text2"), style="color: black;
+                                 font-size: 12px;
+                                 font-style: italic")
+
+output$text2 = renderText({
+  deparse(D(parse(text = input$expr),"x"))
+})
+```
+
+Row {data-height=900}
+-----------------------------------------------------------------------
+
+### bisseccao
+
+```{r}
+
+renderPrint({
+  xn = 0
+
+  f = function(x){
+     return(eval(parse(text = input$expr)))
+  }
+  
+  a = as.numeric(input$a)
+  b = as.numeric(input$b)
+  E = as.numeric(input$E)
+  r = input$r
+  df2 = data.frame(c(0,0,0,0,0,0))
+  df2 = t(df2)
+  colnames(df2) = c("an","bn","xn","f(an)","f(bn)","f(xn)")
+  if(f(a)*f(b)<0 & E != 0){
+    int = 1
+    while((b-a)/(2**(int-1))>E){
+      int = int+ 1
+    }
+    for(i in 1:int){
+      xn = (a+b)/2
+      if(input$t!="truncamento"){
+        xn = arredondar(xn,r)
+      }else{
+        xn = truncar(xn,r)
+      }
+      if(f(xn)==0){
+        print("a raiz é")
+        print(xn)
+        break
+      } else{
+        if(input$t!="truncamento"){
+          df2 = rbind(df2, c(arredondar(a,r),arredondar(b,r),arredondar(xn,r),
+                  arredondar(f(a),r),arredondar(f(b),r),arredondar(f(xn),r)) )
+        } else {
+          df2 = rbind(df2, c(truncar(a,r),truncar(b,r),truncar(xn,r),
+                  truncar(f(a),r),truncar(f(b),r),truncar(f(xn),r)) )
+        }
+      }
+      
+      if(f(a)*f(xn)<0){
+        b = xn
+      }else{
+        a = xn
+      }
+    }
+  }
+  if(length(rownames(df2))>1){
+    df2 = df2[2:(length(rownames(df2))),]
+  }
+  rownames(df2) = NULL
+  print(df2)
+  print("a raiz é")
+  if(input$t!="truncamento"){
+    print(arredondar(xn,r))
+  } else{
+    print(truncar(xn,r))
+  }
+})
+```
+
+### newton
+
+```{r}
+
+renderPrint({
+  
+
+  f = function(x){
+     return(eval(parse(text = input$expr)))
+  }
+  fdx = function(x){
+    h = D(parse(text = input$expr),"x")
+    return(eval(h))
+  }
+  
+  x0 = as.numeric(input$x0)
+  E = as.numeric(input$E)
+  r = input$r
+  df2 = data.frame(c(0,0,0,0))
+  df2 = t(df2)
+  df2 = rbind(df2, c(arredondar(x0,r),arredondar(f(x0),r),arredondar(fdx(x0),r),""))
+  colnames(df2) = c("xn","f(xn)","f'(xn)","|xn - xn-1|")
+  if(f(x0)!=0 & E!= 0){
+    while(TRUE){
+      x1 = x0 - f(x0)/fdx(x0)
+      if(input$t!="truncamento"){
+        x0 = arredondar(x0,r)
+        x1 = arredondar(x1,r)
+      }else{
+        x0 = truncar(x0,r)
+        x1 = truncar(x1,r)
+      }
+      if(abs(x1-x0)<=E){
+
+        break
+      } else{
+       if(input$t!="truncamento"){
+          df2 = rbind(df2, c(arredondar(x1,r),arredondar(f(x1),r),arredondar(fdx(x1),r),
+                  arredondar(abs(x1-x0),r) ))
+        } else {
+          df2 = rbind(df2, c(truncar(x1,r),truncar(f(x1),r),truncar(fdx(x1),r),
+                  truncar(abs(x1-x0),r) ))
+        }
+      }
+      x0 = x1
+    }
+  }
+  if(length(rownames(df2))>1){
+    df2 = df2[2:(length(rownames(df2))),]
+  }
+  rownames(df2) = NULL
+  print(df2)
+  print("a raiz é")
+  if(input$t!="truncamento"){
+    print(arredondar(x0,r))
+  } else{
+    print(truncar(x0,r))
+  }
+})
+
+```
+
+poli interpolador
+=======================================================================
+
+Input {data-width=10}
+-----------------------------------------------------------------------
+
+```{r}
+
+textInput(
+  "pontos",
+  "pontos",
+  "(-2,6);(0,4);(1.6,-1);(2,0);(2.7,1);(3,1.8)",
+  width = 5000)
+textInput(
+  "pontos2",
+  "pontos com pt extra pro erro",
+  "(-2,6);(0,4);(1.6,-1);(2,0);(2.7,1);(3,1.8);(3.2,2.1)",
+  width = 5000)
+
+```
+
+Output {data-height=1900}
+-----------------------------------------------------------------------
+
+### la-granja
+
+```{r}
+
+renderPrint({
+  pontos = input$pontos
+  pontos = as.list(strsplit(pontos,";")[[1]])
+
+  for(i in 1:length(pontos)){
+    pontos[[i]] = substr(pontos[[i]], start = 2, stop = (str_length(pontos[[i]])-1))
+    pontos[[i]] = as.list(strsplit(pontos[[i]],",")[[1]])
+  }
+
+lista = list()
+L = 0
+for(i in 1:length(pontos)){
+  p1 = c(1)
+  den = 1
+  for(j in 1:length(pontos)){
+    if(i!=j){
+      p2 = polynomial(c((-1*as.numeric(pontos[[j]][[1]])),1))
+      p2 = p2 * p1
+      p1 = p2
+      den = den * (as.numeric(pontos[[i]][[1]]) - as.numeric(pontos[[j]][[1]]))
+    }
+  } 
+  p = p1
+  lista[[i]] = (as.numeric(pontos[[i]][[2]]))*p/den
+  print("----------------------------------------------------------------------------------")
+  print(paste0("L",(i-1)))
+  print(p, decreasing = TRUE)
+  print(den)
+}
+polinomio = 0
+for(i in lista){
+  polinomio = polinomio + i
+}
+print("----------------------------------------------------------------------------------")
+print("polinomio:")
+print(polinomio, decreasing = TRUE)
+
+})  
+```
+
+### erros
+
+```{r, include = FALSE}
+renderPrint({
+  expr = input$expr4
+  pontos = input$pontos
+  pontos = as.list(strsplit(pontos,";")[[1]])
+  n = length(pontos)
+  for(i in 1:n){
+    pontos[[i]] = substr(pontos[[i]], start = 2, stop = (str_length(pontos[[i]])-1))
+    pontos[[i]] = as.list(strsplit(pontos[[i]],",")[[1]])
+  }
+  n = length(pontos)
+  for(i in 1:n){
+    expr = derivar(expr)
+  }
+  f = function(x){
+     return(eval(expr))
+  }
+  print(expr)
+  #op = optimize(f, interval=c(pontos[[1]][[1]], pontos[[n]][[1]]), maximum=TRUE)
+ # print(op)
+})
+
+```
+
+```{r}
+renderPrint({
+  pontos = input$pontos2
+  pontos = as.list(strsplit(pontos,";")[[1]])
+  n = length(pontos)
+  for(i in 1:n){
+    pontos[[i]] = substr(pontos[[i]], start = 2, stop = (str_length(pontos[[i]])-1))
+    pontos[[i]] = as.list(strsplit(pontos[[i]],",")[[1]])
+  }
+  xi = c()
+  fxi = c()
+  for(i in 1:(2*n-1)){
+    if(i%%2 != 0){
+      xi[i] = as.numeric(pontos[[((i+1)/2)]][[1]])
+      fxi[i] = as.numeric(pontos[[((i+1)/2)]][[2]])
+    }else {
+      xi[i] = ""
+      fxi[i] = ""
+    }
+  }
+  dfe = data.frame(xi, fxi)
+  for(c in 1:(n-1)){
+    for(i in (1+c):(2*n-c-1)){
+      if((i+c)%%2 != 0){
+        dfe[i,(c+2)] = (as.numeric(dfe[(i+1),1+c]) - as.numeric(dfe[(i-1),1+c]))/
+                            (as.numeric(dfe[(i+c),1]) - as.numeric(dfe[(i-c),1]))
+        
+        dfe[i,(c+2)] = arredondar(dfe[i,(c+2)],6)
+      }
+    }
+ }
+
+  print(dfe)
+ 
+})
+
+```
+
+
+
+integral
+=======================================================================
+
+Input {.sidebar data-width=160}
+-----------------------------------------------------------------------
+
+```{r}
+
+textInput(
+  "expr2",
+  "f(x)",
+  "1/(1-2*x)**2")
+textInput("1", "a da integral", 2)
+textInput("2", "b da integral", 3.6)
+textInput("by2", "tamanho do intervalo", value = 0.2)
+numericInput("r2", "casas decimais", 6)
+selectInput("t2", "trunc. ou arren.", choices = c("arredondamento","truncamento"),width = 220)
+
+```
+
+Output {data-height=700}
+-----------------------------------------------------------------------
+
+### x0 ate xn
+
+```{r}
+renderPrint({
+  x0 = as.numeric(input$"1")
+  xn = as.numeric(input$"2")
+  by = as.numeric(input$by2)
+  seq = seq(x0,xn,by)
+  for(i in seq){
+    print(i)
+  }
+  
+})
+
+```
+
+### f(x0) ate f(xn)
+
+```{r}
+
+renderPrint({
+  r2 = input$r2
+  t2 = input$t2
+  x0 = as.numeric(input$"1")
+  xn = as.numeric(input$"2")
+  by = as.numeric(input$by2)
+  seq = seq(x0,xn,by)
+  f = function(x){
+     return(eval(parse(text = input$expr2)))
+  }
+  if(t2!="truncamento"){
+      print(arredondar(f(x0),r2))
+    }else {
+    print(truncar(f(x0),r2))
+    }
+  for(i in seq[2:(length(seq)-1)]){
+    if(t2!="truncamento"){
+      print(arredondar(f(i),r2))
+    }else {
+    print(truncar(f(i),r2))
+    }
+    
+  }
+  if(t2!="truncamento"){
+      print(arredondar(f(xn),r2))
+    }else {
+    print(truncar(f(xn),r2))
+    }
+  
+})
+
+```
+
+
+Row {data-height=300}
+-----------------------------------------------------------------------
+
+### trapezio
+
+```{r}
+renderPrint({
+  r2 = input$r2
+  t2 = input$t2
+  x0 = as.numeric(input$"1")
+  x1 = as.numeric(input$"2")
+  f = function(x){
+     return(eval(parse(text = input$expr2)))
+  }
+  soma = (x1-x0)/2*(f(x0)+f(x1))
+  print("soma:")
+  if(t2!="truncamento"){
+      print(arredondar(soma,r2))
+    }else {
+    print(truncar(soma,r2))
+    }
+  
+  
+})
+
+```
+
+### trapezio generazlizado 
+
+```{r}
+renderPrint({
+  r2 = input$r2
+  t2 = input$t2
+  x0 = as.numeric(input$"1")
+  xn = as.numeric(input$"2")
+  by = as.numeric(input$by2)
+  seq = seq(x0,xn,by)
+  h = (xn - x0)/(length(seq)-1)
+  f = function(x){
+     return(eval(parse(text = input$expr2)))
+  }
+  if(t2!="truncamento"){
+      soma = arredondar(f(x0),r2)
+    }else {
+      soma = truncar(f(x0),r2)
+    }
+  
+  for(i in seq[2:(length(seq)-1)]){
+    if(t2!="truncamento"){
+      soma = soma + 2*arredondar(f(i),r2)
+    }else {
+      soma = soma + 2*truncar(f(i),r2)
+    }
+  }
+  
+   if(t2!="truncamento"){
+      soma = soma + arredondar(f(xn),r2)
+   }else {
+      soma = soma + truncar(f(xn),r2)
+   }
+  
+  print("soma:")
+  
+  if(t2!="truncamento"){
+      print(arredondar(((h/2)*soma),r2))
+   }else {
+      print(truncar(((h/2))*soma,r2))
+    }
+  
+})
+
+```
+
+### simpson
+
+```{r}
+renderPrint({
+  r2 = input$r2
+  t2 = input$t2
+  x0 = as.numeric(input$"1")
+  x2 = as.numeric(input$"2")
+  h = (x2 - x0)/2
+  x1 = x0 + h
+  
+  f = function(x){
+     return(eval(parse(text = input$expr2)))
+  }
+  soma = f(x0)+4*f(x1)+f(x2)
+  print("soma:")
+  
+  if(t2!="truncamento"){
+     print(arredondar((h*soma/3),r2))
+  }else {
+     print(truncar((h*soma/3),r2))
+  }
+
+})
+
+```
+
+### simpson generalizado
+
+```{r}
+renderPrint({
+  r2 = input$r2
+  t2 = input$t2
+  x0 = as.numeric(input$"1")
+  xn = as.numeric(input$"2")
+  by = as.numeric(input$by2)
+  seq = seq(x0,xn,by)
+  h = (xn - x0)/(length(seq)-1)
+  f = function(x){
+     return(eval(parse(text = input$expr2)))
+  }
+  
+  if(t2!="truncamento"){
+      soma = arredondar(f(x0),r2)
+  }else {
+      soma = truncar(f(x0),r2)
+  }
+  soma = f(x0)
+  for(i in 1:(length(seq)-2)){
+    if(i%%2==0){
+      c = 2
+    }else {
+      c = 4
+    }
+    if(t2!="truncamento"){
+      soma = soma + arredondar((c*f(seq[(i+1)])),r2)
+    }else {
+      soma = soma + truncar((c*f(seq[(i+1)])),r2)
+    }
+  }
+  if(t2!="truncamento"){
+      soma = soma + arredondar(f(xn),r2)
+  }else {
+      soma = soma + truncar(f(xn),r2)
+  }
+  print("soma:")
+  
+  if(t2!="truncamento"){
+     print(arredondar((h*soma/3),r2))
+  }else {
+     print(truncar((h*soma/3),r2))
+  }
+  
+})
+
+```
+
+
+integral 2
+=======================================================================
+
+Input {.sidebar data-width=160}
+-----------------------------------------------------------------------
+
+```{r}
+
+textInput("pt", "pontos", "(0,0);(1,2);(2,0.5)")
+numericInput("r3", "casas decimais", 6)
+selectInput("t3", "trunc. ou arren.", choices = c("arredondamento","truncamento"),width = 220)
+
+```
+
+Outputs
+-----------------------------------------------------------------------
+
+### trapezio
+
+```{r}
+renderPrint({
+  pontos = input$pt
+  pontos = as.list(strsplit(pontos,";")[[1]])
+  n = length(pontos)
+  for(i in 1:n){
+    pontos[[i]] = substr(pontos[[i]], start = 2, stop = (str_length(pontos[[i]])-1))
+    pontos[[i]] = as.list(strsplit(pontos[[i]],",")[[1]])
+  }
+  r2 = input$r3
+  t2 = input$t3
+
+  soma = (as.numeric(pontos[[n]][[1]]) - as.numeric(pontos[[1]][[1]]))/2*(as.numeric(pontos[[1]][[2]]) + as.numeric(pontos[[n]][[2]]))
+  print("soma:")
+  if(t2!="truncamento"){
+      print(arredondar(soma,r2))
+  }else {
+      print(truncar(soma,r2))
+  }
+  
+})
+
+```
+
+### trapezio generazlizado 
+
+```{r}
+renderPrint({
+  pontos = input$pt
+  pontos = as.list(strsplit(pontos,";")[[1]])
+  n = length(pontos)
+  for(i in 1:n){
+    pontos[[i]] = substr(pontos[[i]], start = 2, stop = (str_length(pontos[[i]])-1))
+    pontos[[i]] = as.list(strsplit(pontos[[i]],",")[[1]])
+  }
+
+  r2 = input$r3
+  t2 = input$t3
+  h = (as.numeric(pontos[[n]][[1]]) - as.numeric(pontos[[1]][[1]]))/(n-1)
+  soma = as.numeric(pontos[[1]][[2]])
+  for(i in 2:(n-1)){
+      soma = soma + 2*as.numeric(pontos[[i]][[2]])
+  }
+  soma = soma + as.numeric(pontos[[n]][[2]])
+  
+  print("soma:")
+  
+  if(t2!="truncamento"){
+      print(arredondar(((h/2)*soma),r2))
+   }else {
+      print(truncar(((h/2))*soma,r2))
+    }
+  
+})
+
+```
+
+Row
+-----------------------------------------------------------------------
+
+### simpson
+
+```{r}
+renderPrint({
+  pontos = input$pt
+  pontos = as.list(strsplit(pontos,";")[[1]])
+  n = length(pontos)
+  if(n==3){
+      for(i in 1:n){
+        pontos[[i]] = substr(pontos[[i]], start = 2, stop = (str_length(pontos[[i]])-1))
+        pontos[[i]] = as.list(strsplit(pontos[[i]],",")[[1]])
+      }
+      r2 = input$r3
+      t2 = input$t3
+      h = (as.numeric(pontos[[3]][[1]]) - as.numeric(pontos[[1]][[1]]))/2
+    
+      
+      soma = as.numeric(pontos[[1]][[2]])+4*as.numeric(pontos[[2]][[2]])+as.numeric(pontos[[3]][[2]])
+      print("soma:")
+      
+      if(t2!="truncamento"){
+         print(arredondar((h*soma/3),r2))
+      }else {
+         print(truncar((h*soma/3),r2))
+      }
+  }
+})
+
+```
+
+### simpson generalizado
+
+```{r}
+renderPrint({
+  pontos = input$pt
+  pontos = as.list(strsplit(pontos,";")[[1]])
+  n = length(pontos)
+  for(i in 1:n){
+        pontos[[i]] = substr(pontos[[i]], start = 2, stop = (str_length(pontos[[i]])-1))
+        pontos[[i]] = as.list(strsplit(pontos[[i]],",")[[1]])
+      }
+  r2 = input$r3
+  t2 = input$t3
+  h = (as.numeric(pontos[[3]][[1]]) - as.numeric(pontos[[1]][[1]]))/(n-1)
+
+  soma = as.numeric(pontos[[1]][[2]])
+  for(i in 2:(n-1)){
+    if(i%%2!=0){
+      c = 2
+    }else {
+      c = 4
+    }
+    soma = soma + c*as.numeric(pontos[[i]][[2]])
+  }
+  soma = soma + arredondar(as.numeric(pontos[[n]][[2]]),r2)
+  print("soma:")
+  
+  if(t2!="truncamento"){
+     print(arredondar((h*soma/3),r2))
+  }else {
+     print(truncar((h*soma/3),r2))
+  }
+  
+})
+
+```
